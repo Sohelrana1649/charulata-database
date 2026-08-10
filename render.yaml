@@ -1,0 +1,28 @@
+services:
+  - type: web
+    name: charulata-backend
+    env: node
+    plan: free
+    buildCommand: npm install && npm run build
+    startCommand: npm start
+    envVars:
+      - key: PORT
+        value: 10000
+      - key: NODE_ENV
+        value: production
+      - key: MONGO_URI
+        sync: false # User will input this on Render dashboard
+      - key: JWT_SECRET
+        generateValue: true # Render will auto-generate a secure random key
+      - key: JWT_EXPIRES_IN
+        value: 7d
+      - key: OTP_EXPIRY_MINUTES
+        value: 5
+      - key: SHIPPING_CHARGE_INSIDE_DHAKA
+        value: 60
+      - key: SHIPPING_CHARGE_OUTSIDE_DHAKA
+        value: 120
+      - key: RESEND_API_KEY
+        sync: false
+      - key: EMAIL_FROM
+        sync: false
