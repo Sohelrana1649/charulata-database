@@ -2,10 +2,36 @@ import { Request, Response } from 'express';
 import { AuthenticatedRequest } from '../middlewares/auth';
 import { OrderService } from '../services/order.service';
 import { catchAsync } from '../utils/catchAsync';
+import { trackPurchase } from '../utils/metaPixel';
 
 export const checkout = catchAsync(async (req: AuthenticatedRequest, res: Response) => {
   const userId = req.user!._id.toString();
   const order = await OrderService.checkout(userId, req.body);
+
+  // Fire-and-forget: Send Purchase event to Meta Conversions API
+  trackPurchase({
+    orderId: order._id?.toString() || order.orderId || '',
+    totalAmount: order.totalAmount || 0,
+    currency: 'BDT',
+    items: (order.items || []).map((item: any) => ({
+      productId: item.product?._id?.toString() || item.product?.toString() || '',
+      name: item.name || '',
+      quantity: item.quantity || 1,
+      price: item.price || 0,
+    })),
+    userData: {
+      email: req.user?.email,
+      phone: req.user?.phone,
+      firstName: req.user?.name?.split(' ')[0],
+      externalId: userId,
+      clientIpAddress: (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() || req.ip,
+      clientUserAgent: req.headers['user-agent'],
+      fbp: req.body._fbp,
+      fbc: req.body._fbc,
+    },
+    eventId: req.body._eventId,
+  }).catch(err => console.error('[META CAPI] checkout error:', err));
+
   res.status(201).json({
     status: 'success',
     data: { order }
@@ -14,6 +40,32 @@ export const checkout = catchAsync(async (req: AuthenticatedRequest, res: Respon
 
 export const guestCheckout = catchAsync(async (req: Request, res: Response) => {
   const order = await OrderService.guestCheckout(req.body);
+
+  // Fire-and-forget: Send Purchase event to Meta Conversions API
+  trackPurchase({
+    orderId: order._id?.toString() || order.orderId || '',
+    totalAmount: order.totalAmount || 0,
+    currency: 'BDT',
+    items: (order.items || []).map((item: any) => ({
+      productId: item.product?._id?.toString() || item.product?.toString() || '',
+      name: item.name || '',
+      quantity: item.quantity || 1,
+      price: item.price || 0,
+    })),
+    userData: {
+      email: req.body.email,
+      phone: req.body.phone || req.body.shippingAddress?.recipientPhone,
+      firstName: req.body.name?.split(' ')[0] || req.body.shippingAddress?.recipientName?.split(' ')[0],
+      city: req.body.shippingAddress?.district,
+      country: 'bd',
+      clientIpAddress: (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() || req.ip,
+      clientUserAgent: req.headers['user-agent'],
+      fbp: req.body._fbp,
+      fbc: req.body._fbc,
+    },
+    eventId: req.body._eventId,
+  }).catch(err => console.error('[META CAPI] guestCheckout error:', err));
+
   res.status(201).json({
     status: 'success',
     message: 'Order placed successfully',

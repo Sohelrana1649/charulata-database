@@ -2,6 +2,7 @@ import { Response } from 'express';
 import { AuthenticatedRequest } from '../middlewares/auth';
 import { AuthService } from '../services/auth.service';
 import { catchAsync } from '../utils/catchAsync';
+import { trackRegistration } from '../utils/metaPixel';
 
 export const register = catchAsync(async (req: AuthenticatedRequest, res: Response) => {
   const result = await AuthService.register(req.body);
@@ -14,6 +15,14 @@ export const register = catchAsync(async (req: AuthenticatedRequest, res: Respon
 export const verifyOtp = catchAsync(async (req: AuthenticatedRequest, res: Response) => {
   const { email, otp } = req.body;
   const result = await AuthService.verifyOtp(email, otp);
+
+  // Fire-and-forget: Track CompleteRegistration on Meta CAPI
+  trackRegistration({
+    email,
+    clientIpAddress: (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() || req.ip,
+    clientUserAgent: req.headers['user-agent'],
+  }).catch(err => console.error('[META CAPI] registration error:', err));
+
   res.status(200).json({
     status: 'success',
     ...result
