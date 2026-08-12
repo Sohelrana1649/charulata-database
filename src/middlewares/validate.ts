@@ -10,14 +10,27 @@ export const validate = (schema: z.ZodTypeAny) => (req: Request, res: Response, 
     });
     next();
   } catch (error: any) {
-    if (error && error.errors && Array.isArray(error.errors)) {
-      const errors = error.errors.map((err: any) => ({
-        field: err.path.slice(1).join('.'),
+    const issues = error?.issues || error?.errors;
+    if (error && Array.isArray(issues)) {
+      const errors = issues.map((err: any) => ({
+        field: Array.isArray(err.path) ? err.path.filter((p: any) => p !== 'body' && p !== 'query' && p !== 'params').join('.') : '',
         message: err.message
       }));
+
+      const primaryMessage = errors
+        .map((e: any) => {
+          if (e.field) {
+            const fieldName = e.field.charAt(0).toUpperCase() + e.field.slice(1);
+            return `${fieldName}: ${e.message}`;
+          }
+          return e.message;
+        })
+        .filter(Boolean)
+        .join('. ') || 'Validation failed. Please check your inputs.';
+
       res.status(400).json({
         status: 'fail',
-        message: 'Validation failed',
+        message: primaryMessage,
         errors
       });
       return;
@@ -25,3 +38,4 @@ export const validate = (schema: z.ZodTypeAny) => (req: Request, res: Response, 
     next(error);
   }
 };
+

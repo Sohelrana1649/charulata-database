@@ -7,6 +7,7 @@ const router = Router();
 // Public routes
 router.get('/', categoryController.getAllCategories);
 router.get('/:slug', categoryController.getCategoryBySlug);
+router.get('/:id/attributes', categoryController.getCategoryAttributes);
 
 // Protected Admin / Staff routes
 router.use(protect, restrictTo('admin', 'staff'));

@@ -46,4 +46,10 @@ export class CategoryService {
     if (!category) throw new AppError('Category not found', 404);
     return category;
   }
+
+  static async getCategoryAttributes(categoryId: string) {
+    const category = await Category.findById(categoryId);
+    if (!category) throw new AppError('Category not found', 404);
+    return category.attributes || [];
+  }
 }

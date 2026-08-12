@@ -2,22 +2,50 @@ import { Request, Response, NextFunction } from 'express';
 import { AppError } from '../utils/appError';
 import { config } from '../config';
 
+const formatCleanErrorMessage = (msg: any): string => {
+  if (typeof msg !== 'string') return msg || 'An error occurred';
+  if (msg.trim().startsWith('[') || msg.trim().startsWith('{')) {
+    try {
+      const parsed = JSON.parse(msg);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        const list = parsed
+          .map((item: any) => {
+            if (item?.message) {
+              const field = Array.isArray(item?.path)
+                ? item.path.filter((p: any) => p !== 'body' && p !== 'query' && p !== 'params').join('.')
+                : '';
+              return field ? `${field.charAt(0).toUpperCase() + field.slice(1)}: ${item.message}` : item.message;
+            }
+            return null;
+          })
+          .filter(Boolean);
+        if (list.length > 0) return list.join('. ');
+      }
+    } catch {
+      // not json
+    }
+  }
+  return msg;
+};
+
 const sendErrorDev = (err: any, res: Response) => {
+  const cleanMsg = formatCleanErrorMessage(err.message);
   res.status(err.statusCode || 500).json({
     status: err.status || 'error',
     error: err,
-    message: err.message,
+    message: cleanMsg,
     messageKey: err.messageKey || undefined,
     stack: err.stack,
   });
 };
 
 const sendErrorProd = (err: any, res: Response) => {
+  const cleanMsg = formatCleanErrorMessage(err.message);
   // Operational, trusted error: send message to client
   if (err.isOperational) {
     res.status(err.statusCode).json({
       status: err.status,
-      message: err.message,
+      message: cleanMsg,
       messageKey: err.messageKey || undefined,
       errors: err.errors || undefined,
     });

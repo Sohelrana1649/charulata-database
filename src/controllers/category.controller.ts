@@ -42,3 +42,11 @@ export const deleteCategory = catchAsync(async (req: Request, res: Response) => 
     data: null
   });
 });
+
+export const getCategoryAttributes = catchAsync(async (req: Request, res: Response) => {
+  const attributes = await CategoryService.getCategoryAttributes(req.params.id as string);
+  res.status(200).json({
+    status: 'success',
+    data: { attributes }
+  });
+});

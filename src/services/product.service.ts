@@ -1,9 +1,101 @@
-import { Product } from '../models/product.model';
+import { Product, IVariant } from '../models/product.model';
 import { Category } from '../models/category.model';
 import { slugify } from '../utils/slugify';
 import { AppError } from '../utils/appError';
 import { AnalyticsLog } from '../models/analyticsLog.model';
 import { uploadBase64ToCloudinary } from '../utils/cloudinary';
+
+interface VariantOverride {
+  match: Record<string, string>;
+  price?: number;
+  stockQuantity?: number;
+  sku?: string;
+  image?: string;
+}
+
+/**
+ * Compute the cartesian product of all attribute option arrays.
+ * E.g. [["Red","Blue"],["M","L"]] → [["Red","M"],["Red","L"],["Blue","M"],["Blue","L"]]
+ */
+function cartesianProduct(arrays: string[][]): string[][] {
+  if (arrays.length === 0) return [[]];
+  return arrays.reduce<string[][]>(
+    (acc, curr) => acc.flatMap(combo => curr.map(val => [...combo, val])),
+    [[]]
+  );
+}
+
+/**
+ * Generate IVariant[] from product attributes by computing the full cartesian product.
+ * - "Color" → variant.color
+ * - "Size" → variant.size
+ * - Everything else → variant.attributes map
+ */
+function generateVariantsFromAttributes(
+  attributes: { name: string; options: string[] }[],
+  baseSlug: string,
+  basePrice: number,
+  overrides?: VariantOverride[]
+): IVariant[] {
+  if (!attributes || attributes.length === 0) return [];
+
+  const names = attributes.map(a => a.name);
+  const optionArrays = attributes.map(a => a.options);
+  const combos = cartesianProduct(optionArrays);
+
+  return combos.map(combo => {
+    const variant: IVariant = {
+      stockQuantity: 0
+    };
+
+    const attrMap: Record<string, string> = {};
+    const skuParts: string[] = [baseSlug];
+
+    combo.forEach((value, idx) => {
+      const attrName = names[idx];
+      const nameLower = attrName.toLowerCase();
+
+      if (nameLower === 'color') {
+        variant.color = value;
+      } else if (nameLower === 'size') {
+        variant.size = value;
+      } else {
+        attrMap[attrName] = value;
+      }
+
+      skuParts.push(value.toLowerCase().replace(/[^a-z0-9]+/g, ''));
+    });
+
+    if (Object.keys(attrMap).length > 0) {
+      variant.attributes = attrMap;
+    }
+
+    variant.price = basePrice;
+    variant.sku = skuParts.join('-');
+
+    // Apply overrides if any match this combination
+    if (overrides && overrides.length > 0) {
+      for (const override of overrides) {
+        const matches = Object.entries(override.match).every(([key, val]) => {
+          const keyLower = key.toLowerCase();
+          if (keyLower === 'color') return variant.color === val;
+          if (keyLower === 'size') return variant.size === val;
+          return attrMap[key] === val;
+        });
+
+        if (matches) {
+          if (override.price !== undefined) variant.price = override.price;
+          if (override.stockQuantity !== undefined) variant.stockQuantity = override.stockQuantity;
+          if (override.sku) variant.sku = override.sku;
+          if (override.image) variant.image = override.image;
+          break;
+        }
+      }
+    }
+
+    return variant;
+  });
+}
 
 export class ProductService {
   static async createProduct(data: any) {
@@ -28,6 +120,20 @@ export class ProductService {
     if (Array.isArray(images)) {
       images = await Promise.all(
         images.map(img => typeof img === 'string' && img.startsWith('data:image') ? uploadBase64ToCloudinary(img, 'charulata_products') : img)
+      );
+    }
+
+    // Auto-generate variants from attributes if variants not manually provided
+    if (
+      Array.isArray(data.attributes) &&
+      data.attributes.length > 0 &&
+      (!Array.isArray(data.variants) || data.variants.length === 0)
+    ) {
+      data.variants = generateVariantsFromAttributes(
+        data.attributes,
+        slug,
+        data.price,
+        data.variantOverrides
       );
     }
 
@@ -56,6 +162,25 @@ export class ProductService {
         updateData.images.map((img: string) => typeof img === 'string' && img.startsWith('data:image') ? uploadBase64ToCloudinary(img, 'charulata_products') : img)
       );
     }
+
+    // Auto-generate variants from attributes if variants not manually provided
+    if (
+      Array.isArray(updateData.attributes) &&
+      updateData.attributes.length > 0 &&
+      (!Array.isArray(updateData.variants) || updateData.variants.length === 0)
+    ) {
+      const baseSlug = updateData.slug || (await Product.findById(id).select('slug').lean())?.slug || id;
+      const basePrice = updateData.price ?? (await Product.findById(id).select('price').lean())?.price ?? 0;
+      updateData.variants = generateVariantsFromAttributes(
+        updateData.attributes,
+        baseSlug,
+        basePrice,
+        updateData.variantOverrides
+      );
+    }
+
+    // Remove variantOverrides from the update payload — it's not a stored field
+    delete updateData.variantOverrides;
 
     const product = await Product.findByIdAndUpdate(id, updateData, {
       new: true,
@@ -350,4 +475,40 @@ export class ProductService {
       { title: 1, slug: 1, productImages: 1, price: 1, salePrice: 1 }
     ).limit(8);
   }
+
+  static async reduceVariantStock(
+    productId: string,
+    matcher: { color?: string; size?: string; attributes?: Record<string, string> },
+    quantity: number
+  ) {
+    const product = await Product.findById(productId);
+    if (!product) throw new AppError('Product not found', 404);
+
+    const variantIndex = product.variants.findIndex(v => {
+      if (matcher.color && v.color !== matcher.color) return false;
+      if (matcher.size && v.size !== matcher.size) return false;
+      if (matcher.attributes) {
+        const vAttrs = v.attributes as Map<string, string> | Record<string, string> | undefined;
+        for (const [key, val] of Object.entries(matcher.attributes)) {
+          const vVal = vAttrs instanceof Map ? vAttrs.get(key) : vAttrs?.[key];
+          if (vVal !== val) return false;
+        }
+      }
+      return true;
+    });
+
+    if (variantIndex === -1) {
+      throw new AppError('Matching variant not found', 404);
+    }
+
+    const variant = product.variants[variantIndex];
+    if (variant.stockQuantity < quantity) {
+      throw new AppError('Insufficient stock for this variant', 400);
+    }
+
+    variant.stockQuantity -= quantity;
+    await product.save();
+    return product;
+  }
 }
+

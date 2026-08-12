@@ -21,6 +21,13 @@ export const createProductSchema = z.object({
       image: z.string().optional(),
       attributes: z.record(z.string(), z.string()).optional()
     })).optional(),
+    variantOverrides: z.array(z.object({
+      match: z.record(z.string(), z.string()),
+      price: z.number().min(0).optional(),
+      stockQuantity: z.number().min(0).optional(),
+      sku: z.string().optional(),
+      image: z.string().optional()
+    })).optional(),
     sizes: z.array(z.string()).optional(),
     colors: z.array(z.string()).optional(),
     stockQuantity: z.number().min(0, 'Stock quantity must be non-negative'),
@@ -36,3 +43,4 @@ export const createProductSchema = z.object({
 });
 
 export const updateProductSchema = createProductSchema.partial();
+
