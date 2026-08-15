@@ -32,7 +32,7 @@ export class LandingService {
 
       // 2. All active categories
       Category.find({ isActive: true })
-        .select('name slug image')
+        .select('name nameBn slug image')
         .lean(),
 
       // 3. Best selling products (up to 15)
