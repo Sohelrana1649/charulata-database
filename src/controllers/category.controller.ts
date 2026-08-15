@@ -27,6 +27,8 @@ export const createCategory = catchAsync(async (req: Request, res: Response) => 
       message: 'ক্যাটাগরির ইংরেজি (name) এবং বাংলা (nameBn) নাম উভয়ই প্রদান করা বাধ্যতামূলক।'
     });
   }
+
+   
   const category = await CategoryService.createCategory(req.body);
   res.status(201).json({
     status: 'success',
@@ -42,12 +44,14 @@ export const updateCategory = catchAsync(async (req: Request, res: Response) => 
       message: 'ক্যাটাগরির ইংরেজি (name) এবং বাংলা (nameBn) নাম খালি রাখা যাবে না।'
     });
   }
+
   const category = await CategoryService.updateCategory(req.params.id as string, req.body);
   res.status(200).json({
     status: 'success',
     data: { category }
   });
 });
+
 
 export const deleteCategory = catchAsync(async (req: Request, res: Response) => {
   await CategoryService.deleteCategory(req.params.id as string);
@@ -56,6 +60,8 @@ export const deleteCategory = catchAsync(async (req: Request, res: Response) => 
     data: null
   });
 });
+
+
 
 export const getCategoryAttributes = catchAsync(async (req: Request, res: Response) => {
   const attributes = await CategoryService.getCategoryAttributes(req.params.id as string);

@@ -1,5 +1,9 @@
 import mongoose from 'mongoose';
 import { config } from '../config';
+import '../models/user.model';
+import '../models/product.model';
+import '../models/category.model';
+import '../models/review.model';
 
 export const connectDB = async (): Promise<void> => {
   try {

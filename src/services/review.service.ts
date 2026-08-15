@@ -1,5 +1,6 @@
 import { Review } from '../models/review.model';
 import { Product } from '../models/product.model';
+import { User } from '../models/user.model';
 import { AppError } from '../utils/appError';
 
 export class ReviewService {

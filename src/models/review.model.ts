@@ -1,5 +1,6 @@
 import { Schema, model, Document, Types } from 'mongoose';
 import { Product } from './product.model';
+import { User } from './user.model';
 
 export interface IReview extends Document {
   customer: Types.ObjectId;

@@ -10,6 +10,7 @@
     "start": "node dist/app.js",
     "seed": "ts-node src/scripts/seed.ts",
     "seed:attributes": "ts-node src/scripts/seedAttributes.ts",
+    "seed:reviews": "ts-node src/scripts/seedReviews.ts",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],

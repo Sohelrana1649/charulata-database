@@ -2,6 +2,7 @@ import { Product } from '../models/product.model';
 import { Banner } from '../models/banner.model';
 import { Category } from '../models/category.model';
 import { Review } from '../models/review.model';
+import { User } from '../models/user.model';
 import { CampaignService } from './campaign.service';
 
 // Fields needed for product cards on the landing page (no full description, no variants)
