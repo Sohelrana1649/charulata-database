@@ -31,6 +31,11 @@ const BD_USERS_DATA = [
   { name: 'Rokeya Begum', email: 'rokeya.bd@gmail.com', phone: '01710000023' },
   { name: 'Naima Sultana', email: 'naima.bd@gmail.com', phone: '01710000024' },
   { name: 'Sadia Afrin', email: 'sadia.bd@gmail.com', phone: '01710000025' },
+  { name: 'Tariqul Islam', email: 'tariq.bd@gmail.com', phone: '01710000026' },
+  { name: 'Shirin Akter', email: 'shirin.bd@gmail.com', phone: '01710000027' },
+  { name: 'Arifur Rahman', email: 'arif.bd@gmail.com', phone: '01710000028' },
+  { name: 'Nazmun Nahar', email: 'nazmun.bd@gmail.com', phone: '01710000029' },
+  { name: 'Shahadat Hossain', email: 'shahadat.bd@gmail.com', phone: '01710000030' },
 ];
 
 // Product Reviews Data Definitions with Natural Length Variation (Short, Medium, and Detailed Long)
@@ -49,6 +54,11 @@ const REVIEWS_BY_PRODUCT_KEYWORD = [
         comment: 'Silver Crest electric grinder ta sotyi darun. Shukno morich ar roshun blend korte onek shohoj hoyeche. High quality Product!' 
       },
       { 
+        userIdx: 2, 
+        rating: 5, 
+        comment: 'আম্মুর রান্নাঘরের কাজের সুবিধার জন্য কিনেছিলাম। উনার অনেক পছন্দ হয়েছে। মোটরের স্পিড যেমন বেশি, তেমনি ব্লেডের কাটিং কোয়ালিটিও খুব ফাইন। চারুলতার ডেলিভারি ও প্যাকেজিং নিয়ে কোনো কথা হবে না, ১০ এ ১০!' 
+      },
+      { 
         userIdx: 3, 
         rating: 5, 
         comment: 'ক্যাশ অন ডেলিভারিতে ২ দিনের মধ্যেই ঢাকা থেকে ডেলিভারি পেয়েছি। প্রোডাক্টের ফিনিশিং অনেক ভালো, পাওয়ারফুল মোটর।' 
@@ -59,9 +69,9 @@ const REVIEWS_BY_PRODUCT_KEYWORD = [
         comment: 'Product quality is very good. Blender ta smooth kaj kore. Standard build quality, recommended.' 
       },
       { 
-        userIdx: 2, 
+        userIdx: 5, 
         rating: 5, 
-        comment: 'আম্মুর রান্নাঘরের কাজের সুবিধার জন্য কিনেছিলাম। উনার অনেক পছন্দ হয়েছে। মোটরের স্পিড যেমন বেশি, তেমনি ব্লেডের কাটিং কোয়ালিটিও খুব ফাইন। চারুলতার ডেলিভারি ও প্যাকেজিং নিয়ে কোনো কথা হবে না, ১০ এ ১০!' 
+        comment: 'খুব কাজের একটা জিনিস। শুকনা মরিচ, হলুদ, জিরা মুহূর্তের মধ্যেই একদম মিহি গুঁড়া হয়ে যায়।' 
       },
       { 
         userIdx: 6, 
@@ -74,19 +84,19 @@ const REVIEWS_BY_PRODUCT_KEYWORD = [
         comment: 'এক কথায় অসাধারণ ইলেকট্রিক গ্রাইন্ডার! রান্নাঘরের কাজ অনেক সহজ হয়ে গেছে।' 
       },
       { 
-        userIdx: 16, 
-        rating: 4, 
-        comment: 'Onek valo product. Sound hoi kintu blending fast. Overall satisfied.' 
-      },
-      { 
-        userIdx: 5, 
-        rating: 5, 
-        comment: 'খুব কাজের একটা জিনিস। শুকনা মরিচ, হলুদ, জিরা মুহূর্তের মধ্যেই একদম মিহি গুঁড়া হয়ে যায়।' 
-      },
-      { 
         userIdx: 8, 
         rating: 5, 
         comment: 'Best electric grinder under budget. Packaging secured chilo, pristine condition.' 
+      },
+      { 
+        userIdx: 9, 
+        rating: 5, 
+        comment: 'মসলা পেষার ঝামেলা একদম শেষ। চারুলতাকে ধন্যবাদ এত সুন্দর অরিজিনাল প্রোডাক্ট দেওয়ার জন্য।' 
+      },
+      { 
+        userIdx: 10, 
+        rating: 4, 
+        comment: 'প্যাকেজিং ও ডেলিভারি দুইটাই পারফেক্ট ছিল। ব্যবহার করে অনেক আনন্দ পাচ্ছি।' 
       },
       { 
         userIdx: 11, 
@@ -99,19 +109,9 @@ const REVIEWS_BY_PRODUCT_KEYWORD = [
         comment: 'Great performance and sharp stainless steel blade. Coffee bean ar moshla smooth hoi.' 
       },
       { 
-        userIdx: 10, 
-        rating: 4, 
-        comment: 'প্যাকেজিং ও ডেলিভারি দুইটাই পারফেক্ট ছিল। ব্যবহার করে অনেক আনন্দ পাচ্ছি।' 
-      },
-      { 
         userIdx: 13, 
         rating: 5, 
         comment: '100% Recommended! Stainless steel container quality darun.' 
-      },
-      { 
-        userIdx: 9, 
-        rating: 5, 
-        comment: 'মসলা পেষার ঝামেলা একদম শেষ। চারুলতাকে ধন্যবাদ এত সুন্দর অরিজিনাল প্রোডাক্ট দেওয়ার জন্য।' 
       },
       { 
         userIdx: 14, 
@@ -124,9 +124,74 @@ const REVIEWS_BY_PRODUCT_KEYWORD = [
         comment: 'প্রোডাক্ট অনেক শক্তপোক্ত এবং মোটরের শক্তি অনেক বেশি। ১ মিনিটে মসলা রেডি।' 
       },
       { 
-        userIdx: 17, 
+        userIdx: 16, 
         rating: 4, 
+        comment: 'Onek valo product. Sound hoi kintu blending fast. Overall satisfied.' 
+      },
+      { 
+        userIdx: 17, 
+        rating: 5, 
         comment: 'Sotyi shundor grinder. Daily kitchen usage er jonno josh.' 
+      },
+      { 
+        userIdx: 18, 
+        rating: 5, 
+        comment: 'কালকে হাতে পেয়েছি, আজকেই সরিষা আর জিরা গুড়া করলাম। কোন ঝামেলা ছাড়াই এক নিমিষে গুঁড়া হয়ে গেছে। ধন্যবাদ চারুলতা!' 
+      },
+      { 
+        userIdx: 19, 
+        rating: 5, 
+        comment: 'Ondho bhabe neoa jay! Price onujayi motor power onek beshi. Heavy build.' 
+      },
+      { 
+        userIdx: 20, 
+        rating: 5, 
+        comment: 'আমার স্ত্রীর রান্নার কাজ অর্ধেক সময় কমে গেছে এটা ব্যবহার করার পর। ব্লেড কোয়ালিটি খুব ভালো।' 
+      },
+      { 
+        userIdx: 21, 
+        rating: 5, 
+        comment: 'Silver Crest RAK-001 is a beast grinder! Easy to clean and use.' 
+      },
+      { 
+        userIdx: 22, 
+        rating: 4, 
+        comment: 'দাম অনুযায়ী খুবই কাজের একটা কিচেন গেজেট। ভালো সার্ভিস দিচ্ছে।' 
+      },
+      { 
+        userIdx: 23, 
+        rating: 5, 
+        comment: 'Khub sundor hoyeche packaging. Cash on delivery te dekhe shune nite perechi.' 
+      },
+      { 
+        userIdx: 24, 
+        rating: 5, 
+        comment: 'কফি বিন ব্লেন্ড করার জন্য নিয়েছিলাম। এক সেকেন্ডেই পাউডার হয়ে গেছে। জোস পারফরম্যান্স!' 
+      },
+      { 
+        userIdx: 25, 
+        rating: 5, 
+        comment: 'Chittagong e 3 diner moddhe delivery peyechi. Heavy motor sound e bujha jay power koto.' 
+      },
+      { 
+        userIdx: 26, 
+        rating: 5, 
+        comment: 'এত কম দামে এত প্রিমিয়াম গ্রাইন্ডার পাব ভাবিনি। স্টেইনলেস স্টিলের জারটা বেশ মজবুত।' 
+      },
+      { 
+        userIdx: 27, 
+        rating: 4, 
+        comment: 'Valo product. Charulata shop trustworthy, er ageo product niyechi.' 
+      },
+      { 
+        userIdx: 28, 
+        rating: 5, 
+        comment: 'প্রতিটি রান্নায় তাজা মসলার ঘ্রাণ পেতে সিলভার ক্রেস্টের এই গ্রাইন্ডারটি সেরা পছন্দ।' 
+      },
+      { 
+        userIdx: 29, 
+        rating: 5, 
+        comment: 'Super fast grinding! Shukno morich ar golmorich ekdom finest powder hoe jay. Thanks!' 
       }
     ]
   },
@@ -422,9 +487,16 @@ const seedReviews = async () => {
 
     // Step 2: Seed reviews for each target product
     for (const targetItem of REVIEWS_BY_PRODUCT_KEYWORD) {
-      // Find product by title keyword
-      const regex = new RegExp(targetItem.keyword, 'i');
-      const product = await Product.findOne({ title: regex });
+      // Find product by title keyword or slug
+      const regex = new RegExp(targetItem.keyword.replace(/-/g, '[\\s-]'), 'i');
+      const slugMatch = targetItem.keyword.toLowerCase().replace(/[^a-z0-9]+/g, '-');
+      const product = await Product.findOne({
+        $or: [
+          { title: regex },
+          { slug: slugMatch },
+          { slug: 'silver-crest-rak-001-electric-grinder' }
+        ]
+      });
 
       if (!product) {
         console.warn(`[REVIEW SEEDER] Warning: Product matching "${targetItem.keyword}" not found. Skipping.`);
