@@ -9,6 +9,7 @@ export interface IVariant {
   color?: string;
   size?: string;
   price?: number;
+  salePrice?: number;
   stockQuantity: number;
   sku?: string;
   image?: string;
@@ -51,6 +52,7 @@ const variantSchema = new Schema<IVariant>({
   color: { type: String },
   size: { type: String },
   price: { type: Number },
+  salePrice: { type: Number },
   stockQuantity: { type: Number, required: true, default: 0 },
   sku: { type: String },
   image: { type: String },

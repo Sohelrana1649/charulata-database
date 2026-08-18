@@ -97,23 +97,51 @@ export class OrderService {
         throw new AppError(`Insufficient stock for product: ${productObj.title}. Only ${productObj.stockQuantity} items left.`, 400);
       }
 
-      const isDiscountExpired = productObj.discountEndDate && new Date() > new Date(productObj.discountEndDate);
-      const hasValidSalePrice = !isDiscountExpired &&
-        productObj.salePrice !== undefined &&
-        productObj.salePrice !== null &&
-        Number(productObj.salePrice) > 0 &&
-        Number(productObj.salePrice) < Number(productObj.price);
+      // Check if item matches a specific product variant with custom price/salePrice
+      let variantRegularPrice: number | null = null;
+      let variantSalePrice: number | null = null;
+      const selColor = item.selectedColor || item.color;
+      const selSize = item.selectedSize || item.size;
+      const selAttrs = item.selectedAttributes;
 
-      const unitPrice = hasValidSalePrice ? Number(productObj.salePrice) : Number(productObj.price);
+      if (Array.isArray(productObj.variants) && productObj.variants.length > 0) {
+        const matched = productObj.variants.find((v: any) => {
+          const vAttrs = v.attributes ? (v.attributes instanceof Map ? Object.fromEntries(v.attributes) : v.attributes) : {};
+          if (selAttrs && typeof selAttrs === 'object' && Object.keys(selAttrs).length > 0) {
+            const matchesAll = Object.entries(selAttrs).every(([key, val]) => {
+              const kLower = String(key).toLowerCase();
+              if (kLower === 'color') return (v.color === val || vAttrs[key] === val || vAttrs['Color'] === val);
+              if (kLower === 'size') return (v.size === val || vAttrs[key] === val || vAttrs['Size'] === val);
+              return (vAttrs[key] === val || vAttrs[kLower] === val);
+            });
+            if (matchesAll) return true;
+          }
+          const matchColor = !selColor || v.color === selColor || vAttrs['Color'] === selColor;
+          const matchSize = !selSize || v.size === selSize || vAttrs['Size'] === selSize;
+          return matchColor && matchSize;
+        });
+
+        if (matched) {
+          if (typeof matched.price === 'number' && matched.price > 0) variantRegularPrice = matched.price;
+          if (typeof matched.salePrice === 'number' && matched.salePrice > 0) variantSalePrice = matched.salePrice;
+        }
+      }
+
+      const effectiveRegular = variantRegularPrice !== null ? variantRegularPrice : Number(productObj.price || 0);
+      const effectiveSale = variantSalePrice !== null ? variantSalePrice : (Number(productObj.salePrice) || 0);
+      const isDiscountExpired = productObj.discountEndDate && new Date() > new Date(productObj.discountEndDate);
+      const isSale = !isDiscountExpired && effectiveSale > 0 && effectiveRegular > 0 && effectiveSale < effectiveRegular;
+
+      const unitPrice = isSale ? effectiveSale : effectiveRegular;
 
       subTotal += unitPrice * item.quantity;
       orderItems.push({
         product: productObj._id,
         quantity: item.quantity,
         price: unitPrice,
-        selectedColor: item.selectedColor || item.color,
-        selectedSize: item.selectedSize || item.size,
-        selectedAttributes: item.selectedAttributes
+        selectedColor: selColor,
+        selectedSize: selSize,
+        selectedAttributes: selAttrs
       });
     }
 
@@ -310,36 +338,56 @@ export class OrderService {
         throw new AppError(`Insufficient stock for product: ${productObj.title}. Only ${productObj.stockQuantity} items left.`, 400);
       }
 
-      // If variant was chosen, check variant stock
-      if (item.color || item.size) {
-        const variant = productObj.variants.find(
-          (v: any) =>
-            (!item.color || v.color === item.color) &&
-            (!item.size || v.size === item.size)
-        );
-        if (variant && variant.stockQuantity < item.quantity) {
-          throw new AppError(`Insufficient stock for variant (${item.color || ''} ${item.size || ''}) of product: ${productObj.title}`, 400);
+      // Check if item matches a specific product variant with custom price/salePrice
+      let variantRegularPrice: number | null = null;
+      let variantSalePrice: number | null = null;
+      const selColor = item.color;
+      const selSize = item.size;
+      const selAttrs = item.selectedAttributes
+        ? (item.selectedAttributes instanceof Map ? Object.fromEntries(item.selectedAttributes) : item.selectedAttributes)
+        : undefined;
+
+      if (Array.isArray(productObj.variants) && productObj.variants.length > 0) {
+        const matched = productObj.variants.find((v: any) => {
+          const vAttrs = v.attributes ? (v.attributes instanceof Map ? Object.fromEntries(v.attributes) : v.attributes) : {};
+          if (selAttrs && typeof selAttrs === 'object' && Object.keys(selAttrs).length > 0) {
+            const matchesAll = Object.entries(selAttrs).every(([key, val]) => {
+              const kLower = String(key).toLowerCase();
+              if (kLower === 'color') return (v.color === val || vAttrs[key] === val || vAttrs['Color'] === val);
+              if (kLower === 'size') return (v.size === val || vAttrs[key] === val || vAttrs['Size'] === val);
+              return (vAttrs[key] === val || vAttrs[kLower] === val);
+            });
+            if (matchesAll) return true;
+          }
+          const matchColor = !selColor || v.color === selColor || vAttrs['Color'] === selColor;
+          const matchSize = !selSize || v.size === selSize || vAttrs['Size'] === selSize;
+          return matchColor && matchSize;
+        });
+
+        if (matched) {
+          if (matched.stockQuantity < item.quantity) {
+            throw new AppError(`Insufficient stock for selected variant of product: ${productObj.title}`, 400);
+          }
+          if (typeof matched.price === 'number' && matched.price > 0) variantRegularPrice = matched.price;
+          if (typeof matched.salePrice === 'number' && matched.salePrice > 0) variantSalePrice = matched.salePrice;
         }
       }
 
-      // Capture price (salePrice if available and discount has not expired, else standard price)
+      const effectiveRegular = variantRegularPrice !== null ? variantRegularPrice : Number(productObj.price || 0);
+      const effectiveSale = variantSalePrice !== null ? variantSalePrice : (Number(productObj.salePrice) || 0);
       const isDiscountExpired = productObj.discountEndDate && new Date() > new Date(productObj.discountEndDate);
-      const hasValidSalePrice = !isDiscountExpired &&
-        productObj.salePrice !== undefined &&
-        productObj.salePrice !== null &&
-        Number(productObj.salePrice) > 0 &&
-        Number(productObj.salePrice) < Number(productObj.price);
+      const isSale = !isDiscountExpired && effectiveSale > 0 && effectiveRegular > 0 && effectiveSale < effectiveRegular;
 
-      const unitPrice = hasValidSalePrice ? Number(productObj.salePrice) : Number(productObj.price);
+      const unitPrice = isSale ? effectiveSale : effectiveRegular;
 
       subTotal += unitPrice * item.quantity;
       orderItems.push({
         product: productObj._id,
         quantity: item.quantity,
         price: unitPrice,
-        selectedColor: item.color,
-        selectedSize: item.size,
-        selectedAttributes: item.selectedAttributes
+        selectedColor: selColor,
+        selectedSize: selSize,
+        selectedAttributes: selAttrs
       });
     }
 

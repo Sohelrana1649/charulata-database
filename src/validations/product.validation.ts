@@ -16,6 +16,7 @@ export const createProductSchema = z.object({
       color: z.string().optional(),
       size: z.string().optional(),
       price: z.number().min(0).optional(),
+      salePrice: z.number().min(0).optional(),
       stockQuantity: z.number().min(0, 'Stock quantity must be non-negative'),
       sku: z.string().optional(),
       image: z.string().optional(),
