@@ -105,21 +105,68 @@ export class OrderService {
       const selAttrs = item.selectedAttributes;
 
       if (Array.isArray(productObj.variants) && productObj.variants.length > 0) {
-        const matched = productObj.variants.find((v: any) => {
+        const targetAttrs: Record<string, string> = selAttrs ? (selAttrs instanceof Map ? Object.fromEntries(selAttrs) : { ...selAttrs }) : {};
+        if (selColor && !targetAttrs['Color']) targetAttrs['Color'] = selColor;
+        if (selSize && !targetAttrs['Size']) targetAttrs['Size'] = selSize;
+
+        const targetEntries = Object.entries(targetAttrs).filter(([_, v]) => Boolean(v));
+        let matched: any = null;
+        let maxScore = -1;
+
+        for (const v of productObj.variants) {
           const vAttrs = v.attributes ? (v.attributes instanceof Map ? Object.fromEntries(v.attributes) : v.attributes) : {};
-          if (selAttrs && typeof selAttrs === 'object' && Object.keys(selAttrs).length > 0) {
-            const matchesAll = Object.entries(selAttrs).every(([key, val]) => {
-              const kLower = String(key).toLowerCase();
-              if (kLower === 'color') return (v.color === val || vAttrs[key] === val || vAttrs['Color'] === val);
-              if (kLower === 'size') return (v.size === val || vAttrs[key] === val || vAttrs['Size'] === val);
-              return (vAttrs[key] === val || vAttrs[kLower] === val);
-            });
-            if (matchesAll) return true;
+          let matchCount = 0;
+          let nonColorMatchCount = 0;
+          let nonColorTotal = 0;
+          let hasColorMismatch = false;
+
+          for (const [key, val] of targetEntries) {
+            const kLower = key.toLowerCase();
+            let itemMatched = false;
+
+            if (kLower === 'color') {
+              const vColor = v.color || vAttrs['Color'] || vAttrs['color'];
+              if (vColor === val) {
+                itemMatched = true;
+              } else if (vColor) {
+                hasColorMismatch = true;
+              }
+            } else if (kLower === 'size') {
+              nonColorTotal++;
+              const vSize = v.size || vAttrs['Size'] || vAttrs['size'];
+              if (vSize === val) {
+                itemMatched = true;
+                nonColorMatchCount++;
+              }
+            } else {
+              nonColorTotal++;
+              if (vAttrs[key] === val || vAttrs[kLower] === val) {
+                itemMatched = true;
+                nonColorMatchCount++;
+              }
+            }
+
+            if (itemMatched) matchCount++;
           }
-          const matchColor = !selColor || v.color === selColor || vAttrs['Color'] === selColor;
-          const matchSize = !selSize || v.size === selSize || vAttrs['Size'] === selSize;
-          return matchColor && matchSize;
-        });
+
+          if (targetEntries.length > 0 && matchCount === targetEntries.length) {
+            matched = v;
+            break;
+          }
+
+          let score = matchCount * 10;
+          if (nonColorTotal > 0 && nonColorMatchCount === nonColorTotal) {
+            score += 50;
+          }
+          if (hasColorMismatch) {
+            score -= 2;
+          }
+
+          if (score > maxScore && score > 0) {
+            maxScore = score;
+            matched = v;
+          }
+        }
 
         if (matched) {
           if (typeof matched.price === 'number' && matched.price > 0) variantRegularPrice = matched.price;
@@ -348,21 +395,68 @@ export class OrderService {
         : undefined;
 
       if (Array.isArray(productObj.variants) && productObj.variants.length > 0) {
-        const matched = productObj.variants.find((v: any) => {
+        const targetAttrs: Record<string, string> = selAttrs ? (selAttrs instanceof Map ? Object.fromEntries(selAttrs) : { ...selAttrs }) : {};
+        if (selColor && !targetAttrs['Color']) targetAttrs['Color'] = selColor;
+        if (selSize && !targetAttrs['Size']) targetAttrs['Size'] = selSize;
+
+        const targetEntries = Object.entries(targetAttrs).filter(([_, v]) => Boolean(v));
+        let matched: any = null;
+        let maxScore = -1;
+
+        for (const v of productObj.variants) {
           const vAttrs = v.attributes ? (v.attributes instanceof Map ? Object.fromEntries(v.attributes) : v.attributes) : {};
-          if (selAttrs && typeof selAttrs === 'object' && Object.keys(selAttrs).length > 0) {
-            const matchesAll = Object.entries(selAttrs).every(([key, val]) => {
-              const kLower = String(key).toLowerCase();
-              if (kLower === 'color') return (v.color === val || vAttrs[key] === val || vAttrs['Color'] === val);
-              if (kLower === 'size') return (v.size === val || vAttrs[key] === val || vAttrs['Size'] === val);
-              return (vAttrs[key] === val || vAttrs[kLower] === val);
-            });
-            if (matchesAll) return true;
+          let matchCount = 0;
+          let nonColorMatchCount = 0;
+          let nonColorTotal = 0;
+          let hasColorMismatch = false;
+
+          for (const [key, val] of targetEntries) {
+            const kLower = key.toLowerCase();
+            let itemMatched = false;
+
+            if (kLower === 'color') {
+              const vColor = v.color || vAttrs['Color'] || vAttrs['color'];
+              if (vColor === val) {
+                itemMatched = true;
+              } else if (vColor) {
+                hasColorMismatch = true;
+              }
+            } else if (kLower === 'size') {
+              nonColorTotal++;
+              const vSize = v.size || vAttrs['Size'] || vAttrs['size'];
+              if (vSize === val) {
+                itemMatched = true;
+                nonColorMatchCount++;
+              }
+            } else {
+              nonColorTotal++;
+              if (vAttrs[key] === val || vAttrs[kLower] === val) {
+                itemMatched = true;
+                nonColorMatchCount++;
+              }
+            }
+
+            if (itemMatched) matchCount++;
           }
-          const matchColor = !selColor || v.color === selColor || vAttrs['Color'] === selColor;
-          const matchSize = !selSize || v.size === selSize || vAttrs['Size'] === selSize;
-          return matchColor && matchSize;
-        });
+
+          if (targetEntries.length > 0 && matchCount === targetEntries.length) {
+            matched = v;
+            break;
+          }
+
+          let score = matchCount * 10;
+          if (nonColorTotal > 0 && nonColorMatchCount === nonColorTotal) {
+            score += 50;
+          }
+          if (hasColorMismatch) {
+            score -= 2;
+          }
+
+          if (score > maxScore && score > 0) {
+            maxScore = score;
+            matched = v;
+          }
+        }
 
         if (matched) {
           if (matched.stockQuantity < item.quantity) {
