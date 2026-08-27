@@ -23,6 +23,7 @@ export interface IUser extends Document {
   otp?: {
     code: string;
     expiresAt: Date;
+    verified?: boolean;
   };
   savedAddresses: ISavedAddress[];
   profileImage?: string;

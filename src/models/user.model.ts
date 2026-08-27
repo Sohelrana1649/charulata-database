@@ -35,7 +35,8 @@ const userSchema = new Schema<IUser, UserModel, IUserMethods>(
     active: { type: Boolean, default: true },
     otp: {
       code: { type: String },
-      expiresAt: { type: Date }
+      expiresAt: { type: Date },
+      verified: { type: Boolean, default: false }
     },
     savedAddresses: [addressSchema],
     profileImage: { type: String, default: '' },

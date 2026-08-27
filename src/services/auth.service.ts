@@ -124,7 +124,9 @@ export class AuthService {
   }
 
   static async verifyOtp(email: string, otp: string) {
-    const user = await User.findOne({ email }).select('+password');
+    const cleanEmail = (email || '').trim().toLowerCase();
+    const cleanOtp = (otp || '').toString().trim();
+    const user = await User.findOne({ email: cleanEmail }).select('+password');
     if (!user) {
       throw new AppError('User not found', 404);
     }
@@ -133,17 +135,20 @@ export class AuthService {
       throw new AppError('No OTP request found. Please request a new OTP.', 400);
     }
 
-    if (user.otp.code !== otp) {
+    if (user.otp.code.toString().trim() !== cleanOtp) {
       throw new AppError('Invalid OTP code', 400);
     }
 
-    if (new Date() > user.otp.expiresAt) {
+    if (new Date() > new Date(user.otp.expiresAt)) {
       throw new AppError('OTP has expired. Please request a new one.', 400);
     }
 
-    // Verify user and invalidate OTP immediately to prevent replay attacks
+    // Verify user and preserve verified OTP status for 15 minutes to allow password reset
     user.isVerified = true;
-    user.otp = undefined;
+    if (user.otp) {
+      user.otp.verified = true;
+      user.otp.expiresAt = new Date(Date.now() + 15 * 60 * 1000);
+    }
     await user.save();
 
     const token = generateToken(user._id.toString());
@@ -287,7 +292,8 @@ export class AuthService {
   }
 
   static async forgotPassword(email: string) {
-    const user = await User.findOne({ email });
+    const cleanEmail = (email || '').trim().toLowerCase();
+    const user = await User.findOne({ email: cleanEmail });
     if (!user) {
       throw new AppError('No user found with that email address.', 404);
     }
@@ -333,18 +339,32 @@ export class AuthService {
 
   static async resetPassword(resetData: any) {
     const { email, otp, password } = resetData;
-    const user = await User.findOne({ email }).select('+password');
+    const cleanEmail = (email || '').trim().toLowerCase();
+    const cleanOtp = (otp || '').toString().trim();
+
+    if (!cleanEmail) {
+      throw new AppError('Email is required', 400);
+    }
+    if (!password || password.length < 6) {
+      throw new AppError('Password must be at least 6 characters', 400);
+    }
+
+    const user = await User.findOne({ email: cleanEmail }).select('+password');
     if (!user) {
       throw new AppError('User not found', 404);
     }
 
-    if (!user.otp || user.otp.code !== otp || new Date() > user.otp.expiresAt) {
+    const isExpired = !user.otp?.expiresAt || new Date() > new Date(user.otp.expiresAt);
+    const codeMatches = user.otp?.code && user.otp.code.toString().trim() === cleanOtp;
+    const isAlreadyVerified = user.otp?.verified === true && !isExpired;
+
+    if (isExpired || (!codeMatches && !isAlreadyVerified)) {
       throw new AppError('Invalid or expired OTP', 400);
     }
 
     user.password = password;
     user.otp = undefined;
-    user.isVerified = true; // verification by proxy
+    user.isVerified = true;
     await user.save();
 
     return {
