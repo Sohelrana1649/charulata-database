@@ -34,4 +34,6 @@ export const config = {
   cloudinaryCloudName: process.env.CLOUDINARY_CLOUD_NAME || 'ybfk3z5b',
   cloudinaryApiKey: process.env.CLOUDINARY_API_KEY || '413321881982569',
   cloudinaryApiSecret: process.env.CLOUDINARY_API_SECRET || 'mRiHJVHW3IHSFUHGN_6czgY3V74',
+  frontendUrl: process.env.FRONTEND_URL || 'http://localhost:3000',
+  revalidationSecret: process.env.REVALIDATION_SECRET || process.env.REVALIDATE_SECRET || '9f09eb35ed02a96631acca50b4c3282ab25658ddcba080c1bbef9411fc7d81ee',
 };

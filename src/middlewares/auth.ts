@@ -83,3 +83,5 @@ export const optionalProtect = catchAsync(async (req: AuthenticatedRequest, res:
   }
   next();
 });
+
+export const isAdmin = restrictTo('admin', 'super_admin', 'staff');

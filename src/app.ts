@@ -67,6 +67,7 @@ app.use('/uploads', express.static(uploadsDir));
 
 // Mount API Routes
 app.use('/api/v1', apiRouter);
+app.use('/api', apiRouter);
 
 // Base route test
 app.get('/', (req, res) => {
@@ -86,11 +87,15 @@ app.use((req, res, next) => {
 // Global Error Handler
 app.use(errorHandler);
 
+import { startScheduledBlogJob } from './jobs/scheduledBlogJob';
+
 // Connect Database & Start Server
 const PORT = config.port;
 connectDB().then(() => {
   app.listen(PORT, () => {
     console.log(`[CHARULATA BACKEND] Server running in ${config.nodeEnv} mode on port ${PORT}`);
+    // Start periodic background job for scheduled blogs
+    startScheduledBlogJob();
   });
 });
 

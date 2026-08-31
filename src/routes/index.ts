@@ -18,6 +18,7 @@ import subscriberRoutes from './subscriber.routes';
 import contactRoutes from './contact.routes';
 import settingsRoutes from './settings.route';
 import campaignRoutes from './campaign.routes';
+import blogRoutes from './blog.routes';
 import { getLandingData } from '../controllers/landing.controller';
 
 const router = Router();
@@ -44,6 +45,8 @@ router.use('/upload', uploadRoutes);
 router.use('/subscribers', subscriberRoutes);
 router.use('/contacts', contactRoutes);
 router.use('/settings', settingsRoutes);
+router.use('/blogs', blogRoutes);
 
 export default router;
+
 
