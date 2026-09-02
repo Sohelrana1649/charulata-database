@@ -33,7 +33,7 @@ function cartesianProduct(arrays: string[][]): string[][] {
  */
 function generateVariantsFromAttributes(
   attributes: { name: string; options: string[] }[],
-  baseSlug: string,
+  baseSku: string,
   basePrice: number,
   overrides?: VariantOverride[]
 ): IVariant[] {
@@ -43,13 +43,15 @@ function generateVariantsFromAttributes(
   const optionArrays = attributes.map(a => a.options);
   const combos = cartesianProduct(optionArrays);
 
+  const cleanBaseSku = (baseSku || '').trim();
+
   return combos.map(combo => {
     const variant: IVariant = {
       stockQuantity: 0
     };
 
     const attrMap: Record<string, string> = {};
-    const skuParts: string[] = [baseSlug];
+    const skuParts: string[] = cleanBaseSku ? [cleanBaseSku] : [];
 
     combo.forEach((value, idx) => {
       const attrName = names[idx];
@@ -63,7 +65,10 @@ function generateVariantsFromAttributes(
         attrMap[attrName] = value;
       }
 
-      skuParts.push(value.toLowerCase().replace(/[^a-z0-9]+/g, ''));
+      const cleanVal = (value || '').toString().trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
+      if (cleanVal) {
+        skuParts.push(cleanVal);
+      }
     });
 
     if (Object.keys(attrMap).length > 0) {
@@ -71,7 +76,7 @@ function generateVariantsFromAttributes(
     }
 
     variant.price = basePrice;
-    variant.sku = skuParts.join('-');
+    variant.sku = skuParts.length > 0 ? skuParts.join('-') : (cleanBaseSku || 'SKU');
 
     // Apply overrides if any match this combination
     if (overrides && overrides.length > 0) {
@@ -129,9 +134,10 @@ export class ProductService {
       data.attributes.length > 0 &&
       (!Array.isArray(data.variants) || data.variants.length === 0)
     ) {
+      const baseSku = data.sku ? String(data.sku).trim() : slug;
       data.variants = generateVariantsFromAttributes(
         data.attributes,
-        slug,
+        baseSku,
         data.price,
         data.variantOverrides
       );
@@ -169,11 +175,12 @@ export class ProductService {
       updateData.attributes.length > 0 &&
       (!Array.isArray(updateData.variants) || updateData.variants.length === 0)
     ) {
-      const baseSlug = updateData.slug || (await Product.findById(id).select('slug').lean())?.slug || id;
-      const basePrice = updateData.price ?? (await Product.findById(id).select('price').lean())?.price ?? 0;
+      const existingProduct = await Product.findById(id).select('sku slug price').lean();
+      const baseSku = updateData.sku || existingProduct?.sku || updateData.slug || existingProduct?.slug || id;
+      const basePrice = updateData.price ?? existingProduct?.price ?? 0;
       updateData.variants = generateVariantsFromAttributes(
         updateData.attributes,
-        baseSlug,
+        baseSku,
         basePrice,
         updateData.variantOverrides
       );

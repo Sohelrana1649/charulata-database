@@ -14,7 +14,7 @@ export const checkout = catchAsync(async (req: AuthenticatedRequest, res: Respon
     totalAmount: order.totalAmount || 0,
     currency: 'BDT',
     items: (order.items || []).map((item: any) => ({
-      productId: item.product?._id?.toString() || item.product?.toString() || '',
+      productId: item.product?.sku ? String(item.product.sku).trim() : (item.product?._id?.toString() || item.product?.toString() || ''),
       name: item.name || '',
       quantity: item.quantity || 1,
       price: item.price || 0,
@@ -47,7 +47,7 @@ export const guestCheckout = catchAsync(async (req: Request, res: Response) => {
     totalAmount: order.totalAmount || 0,
     currency: 'BDT',
     items: (order.items || []).map((item: any) => ({
-      productId: item.product?._id?.toString() || item.product?.toString() || '',
+      productId: item.product?.sku ? String(item.product.sku).trim() : (item.product?._id?.toString() || item.product?.toString() || ''),
       name: item.name || '',
       quantity: item.quantity || 1,
       price: item.price || 0,
