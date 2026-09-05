@@ -24,3 +24,14 @@ export const authLimiter = rateLimit({
     message: 'Too many authentication attempts. Please try again after 15 minutes'
   }
 });
+
+export const leadLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: isDev ? 1000 : 10, // Limit each IP to 10 requests per 15 minutes for lead captures
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: {
+    status: 'fail',
+    message: 'Too many requests from this IP. Please try again after 15 minutes.'
+  }
+});

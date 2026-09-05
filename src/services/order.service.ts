@@ -1,3 +1,4 @@
+import { LeadService } from './lead.service';
 import { Order, DeliveryStatus } from '../models/order.model';
 import { Cart } from '../models/cart.model';
 import { Product } from '../models/product.model';
@@ -359,6 +360,12 @@ export class OrderService {
     // Populate product info for frontend order success display
     await order.populate('items.product', 'title productImages salePrice price sku');
 
+    try {
+      await LeadService.markConvertedByPhone(shippingAddress.recipientPhone || cleanPhone, order._id);
+    } catch (leadErr) {
+      console.error('[LEAD CONVERSION ERROR]', leadErr);
+    }
+
     return order;
   }
   static async checkout(userId: string, checkoutData: any) {
@@ -680,6 +687,14 @@ export class OrderService {
 
     // Populate product info for frontend order success display
     await order.populate('items.product', 'title productImages salePrice price sku');
+
+    try {
+      if (shippingAddress?.recipientPhone) {
+        await LeadService.markConvertedByPhone(shippingAddress.recipientPhone, order._id);
+      }
+    } catch (leadErr) {
+      console.error('[LEAD CONVERSION ERROR]', leadErr);
+    }
 
     return order;
   }

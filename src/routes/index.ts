@@ -19,6 +19,11 @@ import contactRoutes from './contact.routes';
 import settingsRoutes from './settings.route';
 import campaignRoutes from './campaign.routes';
 import blogRoutes from './blog.routes';
+import leadRoutes from './lead.routes';
+import { saveLead } from '../controllers/lead.controller';
+import { leadLimiter } from '../middlewares/rateLimiter';
+import { validate } from '../middlewares/validate';
+import { saveLeadSchema } from '../validations/lead.validation';
 import { getLandingData } from '../controllers/landing.controller';
 
 const router = Router();
@@ -46,6 +51,8 @@ router.use('/subscribers', subscriberRoutes);
 router.use('/contacts', contactRoutes);
 router.use('/settings', settingsRoutes);
 router.use('/blogs', blogRoutes);
+router.use('/leads', leadRoutes);
+router.post('/save-lead', leadLimiter, validate(saveLeadSchema), saveLead);
 
 export default router;
 
