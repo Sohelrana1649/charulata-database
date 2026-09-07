@@ -102,6 +102,35 @@ function generateVariantsFromAttributes(
   });
 }
 
+
+/**
+ * Auto-generate SEO metaTitle and metaDescription with word-boundary truncation
+ */
+function generateFallbackSeo(title?: string, description?: string, metaTitle?: string, metaDescription?: string): { metaTitle: string; metaDescription: string } {
+  let finalMetaTitle = metaTitle ? metaTitle.trim() : '';
+  if (!finalMetaTitle) {
+    const rawTitle = (title || '').trim();
+    finalMetaTitle = rawTitle ? `${rawTitle} | Charulata Lifestyle` : 'Charulata Lifestyle';
+    if (finalMetaTitle.length > 70) {
+      finalMetaTitle = finalMetaTitle.slice(0, 67).trim() + '...';
+    }
+  }
+
+  let finalMetaDesc = metaDescription ? metaDescription.trim() : '';
+  if (!finalMetaDesc) {
+    const cleaned = (description || '').replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
+    if (cleaned.length <= 155) {
+      finalMetaDesc = cleaned || (title ? `Buy ${title} online at Charulata Lifestyle BD.` : 'Shop premium fashion at Charulata Lifestyle.');
+    } else {
+      const truncated = cleaned.slice(0, 155);
+      const lastSpace = truncated.lastIndexOf(' ');
+      finalMetaDesc = (lastSpace > 30 ? truncated.slice(0, lastSpace).trim() : truncated) + '...';
+    }
+  }
+
+  return { metaTitle: finalMetaTitle, metaDescription: finalMetaDesc };
+}
+
 export class ProductService {
   static async createProduct(data: any) {
     const slug = slugify(data.title);
@@ -142,6 +171,10 @@ export class ProductService {
         data.variantOverrides
       );
     }
+
+    const seo = generateFallbackSeo(data.title, data.description, data.metaTitle, data.metaDescription);
+    data.metaTitle = seo.metaTitle;
+    data.metaDescription = seo.metaDescription;
 
     return Product.create({ ...data, image, images, slug });
   }
@@ -188,6 +221,15 @@ export class ProductService {
 
     // Remove variantOverrides from the update payload — it's not a stored field
     delete updateData.variantOverrides;
+
+    if (updateData.title || updateData.description || updateData.metaTitle !== undefined || updateData.metaDescription !== undefined) {
+      const existingDoc = await Product.findById(id).select('title description').lean();
+      const targetTitle = updateData.title || existingDoc?.title || '';
+      const targetDesc = updateData.description || existingDoc?.description || '';
+      const seo = generateFallbackSeo(targetTitle, targetDesc, updateData.metaTitle, updateData.metaDescription);
+      updateData.metaTitle = seo.metaTitle;
+      updateData.metaDescription = seo.metaDescription;
+    }
 
     const product = await Product.findByIdAndUpdate(id, updateData, {
       new: true,

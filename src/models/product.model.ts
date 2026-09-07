@@ -20,6 +20,8 @@ export interface IProduct extends Document {
   title: string;
   slug: string;
   description: string;
+  metaTitle?: string;
+  metaDescription?: string;
   price: number;
   salePrice?: number;
   productImages: string[];
@@ -64,6 +66,8 @@ const productSchema = new Schema<IProduct>(
     title: { type: String, required: [true, 'Product title is required'], trim: true },
     slug: { type: String, required: true, unique: true, lowercase: true, index: true },
     description: { type: String, required: [true, 'Product description is required'] },
+    metaTitle: { type: String, trim: true, maxlength: [70, 'Meta title should not exceed 70 characters'] },
+    metaDescription: { type: String, trim: true, maxlength: [160, 'Meta description should not exceed 160 characters'] },
     price: { type: Number, required: [true, 'Product price is required'], min: 0 },
     salePrice: { type: Number, min: 0 },
     productImages: [{ type: String, required: true }],
