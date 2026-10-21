@@ -8,7 +8,7 @@ const promoteToSuperAdmin = async () => {
     await mongoose.connect(config.mongoUri);
     console.log('[PROMOTE] Connected. Searching for target user...');
 
-    const email = 'nxshipon@gmail.com';
+    const email = 'oxshipon1@gmail.com';
     const user = await User.findOne({ email });
 
     if (!user) {

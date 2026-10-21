@@ -133,7 +133,7 @@ function generateFallbackSeo(title?: string, description?: string, metaTitle?: s
 
 export class ProductService {
   static async createProduct(data: any) {
-    const slug = slugify(data.title);
+    const slug = slugify(data.title || data.title_en);
     const existing = await Product.findOne({ slug });
     if (existing) {
       throw new AppError('Product with this title already exists', 400);
@@ -144,6 +144,23 @@ export class ProductService {
     if (!categoryExists) {
       throw new AppError('Invalid category ID', 400);
     }
+
+    // Automatically resolve parentCategory if not provided
+    if (!data.parentCategory) {
+      if (categoryExists.parentCategory) {
+        data.parentCategory = categoryExists.parentCategory;
+      } else if (categoryExists.level === 0) {
+        data.parentCategory = categoryExists._id;
+      }
+    }
+
+    // Fallback defaults for bilingual title & description
+    data.title = data.title || data.title_en || '';
+    data.title_en = data.title_en || data.title || '';
+    data.title_bn = data.title_bn || '';
+    data.description = data.description || data.description_en || '';
+    data.description_en = data.description_en || data.description || '';
+    data.description_bn = data.description_bn || '';
 
     let image = data.image;
     if (image && typeof image === 'string' && image.startsWith('data:image')) {
@@ -176,19 +193,34 @@ export class ProductService {
     data.metaTitle = seo.metaTitle;
     data.metaDescription = seo.metaDescription;
 
-    return Product.create({ ...data, image, images, slug });
+    const product = await Product.create({ ...data, image, images, slug });
+    return Product.findById(product._id).populate('category').populate('parentCategory');
   }
 
   static async updateProduct(id: string, data: any) {
     const updateData = { ...data };
-    if (data.title) {
-      updateData.slug = slugify(data.title);
+    if (data.title || data.title_en) {
+      updateData.title = data.title || data.title_en;
+      updateData.title_en = data.title_en || data.title;
+      updateData.slug = slugify(updateData.title);
+    }
+
+    if (data.description || data.description_en) {
+      updateData.description = data.description || data.description_en;
+      updateData.description_en = data.description_en || data.description;
     }
 
     if (data.category) {
       const categoryExists = await Category.findById(data.category);
       if (!categoryExists) {
         throw new AppError('Invalid category ID', 400);
+      }
+      if (!updateData.parentCategory) {
+        if (categoryExists.parentCategory) {
+          updateData.parentCategory = categoryExists.parentCategory;
+        } else if (categoryExists.level === 0) {
+          updateData.parentCategory = categoryExists._id;
+        }
       }
     }
 
@@ -234,7 +266,7 @@ export class ProductService {
     const product = await Product.findByIdAndUpdate(id, updateData, {
       new: true,
       runValidators: true
-    });
+    }).populate('category').populate('parentCategory');
 
     if (!product) throw new AppError('Product not found', 404);
     return product;
@@ -285,7 +317,10 @@ export class ProductService {
     const isObjectId = /^[0-9a-fA-F]{24}$/.test(slugOrId);
     const query = isObjectId ? { $or: [{ slug: slugOrId }, { _id: slugOrId }] } : { slug: slugOrId };
 
-    const product = await Product.findOne(query).populate('category').lean();
+    const product = await Product.findOne(query)
+      .populate('category')
+      .populate('parentCategory')
+      .lean();
     if (!product) throw new AppError('Product not found', 404);
 
     // Non-blocking async background analytics & view updates for ultra-fast response
@@ -315,7 +350,7 @@ export class ProductService {
       limit = 10
     } = queryParams;
 
-    const filter: any = { isActive: true };
+    const filter: any = { isActive: true, isDeleted: { $ne: true } };
     const andConditions: any[] = [];
 
     // Helper for color keywords mapping
@@ -350,6 +385,7 @@ export class ProductService {
       const matchingCategories = await Category.find({
         $or: [
           { name: searchRegex },
+          { nameBn: searchRegex },
           { slug: searchRegex }
         ]
       });
@@ -358,53 +394,83 @@ export class ProductService {
       andConditions.push({
         $or: [
           { title: searchRegex },
+          { title_en: searchRegex },
+          { title_bn: searchRegex },
           { description: searchRegex },
+          { description_en: searchRegex },
+          { description_bn: searchRegex },
           { tags: { $in: [searchRegex] } },
-          { category: { $in: matchingCategoryIds } }
+          { category: { $in: matchingCategoryIds } },
+          { parentCategory: { $in: matchingCategoryIds } }
         ]
       });
     }
 
     // 2) Category filter
     if (category && category !== 'all') {
-      // Check if category matches ObjectId, else find by slug or name
+      let catDoc: any = null;
       if (String(category).match(/^[0-9a-fA-F]{24}$/)) {
-        andConditions.push({ category });
+        catDoc = await Category.findById(category);
       } else {
         const cleanCat = String(category).trim();
         const catRegex = new RegExp(`^${cleanCat.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&')}$`, 'i');
-        
-        let cat = await Category.findOne({
+        catDoc = await Category.findOne({
           $or: [
             { slug: catRegex },
             { name: catRegex }
           ]
         });
+      }
 
-        if (!cat) {
-          const keywordsPattern = cleanCat.split('-').map(s => s.trim()).filter(Boolean).join('|');
-          if (keywordsPattern) {
-            const flexRegex = new RegExp(keywordsPattern, 'i');
-            const matchingCats = await Category.find({
+      if (catDoc) {
+        if (catDoc.level === 0) {
+          // Parent category: return products directly linked to parent OR in any of its subcategories
+          const subcats = await Category.find({ parentCategory: catDoc._id }).select('_id');
+          const subcatIds = subcats.map(s => s._id);
+          andConditions.push({
+            $or: [
+              { parentCategory: catDoc._id },
+              { category: catDoc._id },
+              { category: { $in: subcatIds } }
+            ]
+          });
+        } else {
+          // Subcategory
+          andConditions.push({
+            $or: [
+              { category: catDoc._id },
+              { parentCategory: catDoc._id }
+            ]
+          });
+        }
+      } else {
+        const cleanCat = String(category).trim();
+        const keywordsPattern = cleanCat.split('-').map(s => s.trim()).filter(Boolean).join('|');
+        if (keywordsPattern) {
+          const flexRegex = new RegExp(keywordsPattern, 'i');
+          const matchingCats = await Category.find({
+            $or: [
+              { slug: flexRegex },
+              { name: flexRegex }
+            ]
+          });
+          if (matchingCats.length > 0) {
+            const catIds = matchingCats.map(c => c._id);
+            andConditions.push({
               $or: [
-                { slug: flexRegex },
-                { name: flexRegex }
+                { category: { $in: catIds } },
+                { parentCategory: { $in: catIds } }
               ]
             });
-            if (matchingCats.length > 0) {
-              andConditions.push({ category: { $in: matchingCats.map(c => c._id) } });
-            } else {
-              andConditions.push({
-                $or: [
-                  { title: flexRegex },
-                  { description: flexRegex },
-                  { tags: { $in: [flexRegex] } }
-                ]
-              });
-            }
+          } else {
+            andConditions.push({
+              $or: [
+                { title: flexRegex },
+                { description: flexRegex },
+                { tags: { $in: [flexRegex] } }
+              ]
+            });
           }
-        } else {
-          andConditions.push({ category: cat._id });
         }
       }
     }
@@ -464,7 +530,9 @@ export class ProductService {
     }
 
     // Build query
-    let query = Product.find(filter).populate('category');
+    let query = Product.find(filter)
+      .populate('category')
+      .populate('parentCategory');
 
     // 5) Sorting
     if (sort) {
