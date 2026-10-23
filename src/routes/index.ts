@@ -20,6 +20,7 @@ import settingsRoutes from './settings.route';
 import campaignRoutes from './campaign.routes';
 import blogRoutes from './blog.routes';
 import leadRoutes from './lead.routes';
+import trackingRoutes from './tracking.routes';
 import { saveLead } from '../controllers/lead.controller';
 import { leadLimiter } from '../middlewares/rateLimiter';
 import { validate } from '../middlewares/validate';
@@ -52,6 +53,7 @@ router.use('/contacts', contactRoutes);
 router.use('/settings', settingsRoutes);
 router.use('/blogs', blogRoutes);
 router.use('/leads', leadRoutes);
+router.use('/tracking', trackingRoutes);
 router.post('/save-lead', leadLimiter, validate(saveLeadSchema), saveLead);
 
 export default router;

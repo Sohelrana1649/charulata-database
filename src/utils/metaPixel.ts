@@ -20,7 +20,7 @@ const sha256 = (value: string): string => {
   return crypto.createHash('sha256').update(value.trim().toLowerCase()).digest('hex');
 };
 
-interface MetaUserData {
+export interface MetaUserData {
   email?: string;
   phone?: string;
   firstName?: string;
@@ -34,13 +34,14 @@ interface MetaUserData {
   externalId?: string;
 }
 
-interface MetaEventOptions {
+export interface MetaEventOptions {
   eventName: string;
   eventId?: string;
   eventSourceUrl?: string;
   userData: MetaUserData;
   customData?: Record<string, any>;
   actionSource?: 'website' | 'app' | 'email' | 'phone_call' | 'chat' | 'physical_store' | 'system_generated' | 'other';
+  testEventCode?: string;
 }
 
 /**
@@ -92,12 +93,18 @@ const formatUserData = (userData: MetaUserData) => {
  * Send event to Meta Conversions API
  */
 export const sendMetaEvent = async (options: MetaEventOptions): Promise<void> => {
-  if (!META_PIXEL_ID || !META_ACCESS_TOKEN) {
+  const pixelId = process.env.META_PIXEL_ID || '';
+  const accessToken = process.env.META_ACCESS_TOKEN || '';
+  const defaultTestCode = process.env.META_TEST_EVENT_CODE || '';
+
+  if (!pixelId || !accessToken) {
     if (process.env.NODE_ENV === 'development') {
       console.log(`[META CAPI] Skipped (no credentials): ${options.eventName}`, options.customData || '');
     }
     return;
   }
+
+  const graphApiUrl = `https://graph.facebook.com/${GRAPH_API_VERSION}/${pixelId}/events`;
 
   const eventData: Record<string, any> = {
     event_name: options.eventName,
@@ -116,13 +123,18 @@ export const sendMetaEvent = async (options: MetaEventOptions): Promise<void> =>
     eventData.custom_data = options.customData;
   }
 
-  const payload = {
+  const payload: Record<string, any> = {
     data: [eventData],
-    access_token: META_ACCESS_TOKEN,
+    access_token: accessToken,
   };
 
+  const activeTestCode = options.testEventCode || defaultTestCode;
+  if (activeTestCode) {
+    payload.test_event_code = activeTestCode;
+  }
+
   try {
-    const response = await fetch(GRAPH_API_URL, {
+    const response = await fetch(graphApiUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
@@ -131,9 +143,9 @@ export const sendMetaEvent = async (options: MetaEventOptions): Promise<void> =>
     if (!response.ok) {
       const errorBody = await response.text();
       console.error(`[META CAPI ERROR] ${response.status}: ${errorBody}`);
-    } else if (process.env.NODE_ENV === 'development') {
+    } else {
       const result = await response.json();
-      console.log(`[META CAPI] ✅ ${options.eventName} sent successfully`, result);
+      console.log(`[META CAPI] ✅ ${options.eventName} sent successfully (Event ID: ${options.eventId || 'none'}, TestCode: ${activeTestCode || 'none'})`, result);
     }
   } catch (error) {
     console.error(`[META CAPI ERROR] Failed to send ${options.eventName}:`, error);
@@ -149,6 +161,64 @@ export const generateEventId = (): string => {
 
 // ─── Pre-built E-commerce Event Helpers ───
 
+/** ViewContent event — call when user views a product page */
+export const trackViewContent = async (viewData: {
+  productId: string;
+  name?: string;
+  price?: number;
+  currency?: string;
+  category?: string;
+  userData: MetaUserData;
+  eventId?: string;
+  sourceUrl?: string;
+  testEventCode?: string;
+}) => {
+  await sendMetaEvent({
+    eventName: 'ViewContent',
+    eventId: viewData.eventId || generateEventId(),
+    eventSourceUrl: viewData.sourceUrl,
+    userData: viewData.userData,
+    testEventCode: viewData.testEventCode,
+    customData: {
+      content_ids: [viewData.productId],
+      content_name: viewData.name,
+      content_type: 'product',
+      content_category: viewData.category,
+      value: viewData.price || 0,
+      currency: viewData.currency || 'BDT',
+    },
+  });
+};
+
+/** AddToCart event — call when user adds product to cart */
+export const trackAddToCart = async (cartData: {
+  productId: string;
+  name?: string;
+  price?: number;
+  quantity?: number;
+  currency?: string;
+  userData: MetaUserData;
+  eventId?: string;
+  sourceUrl?: string;
+  testEventCode?: string;
+}) => {
+  await sendMetaEvent({
+    eventName: 'AddToCart',
+    eventId: cartData.eventId || generateEventId(),
+    eventSourceUrl: cartData.sourceUrl,
+    userData: cartData.userData,
+    testEventCode: cartData.testEventCode,
+    customData: {
+      content_ids: [cartData.productId],
+      content_name: cartData.name,
+      content_type: 'product',
+      value: (cartData.price || 0) * (cartData.quantity || 1),
+      currency: cartData.currency || 'BDT',
+      num_items: cartData.quantity || 1,
+    },
+  });
+};
+
 /** Purchase event — call after successful order creation */
 export const trackPurchase = async (orderData: {
   orderId: string;
@@ -158,18 +228,21 @@ export const trackPurchase = async (orderData: {
   userData: MetaUserData;
   eventId?: string;
   sourceUrl?: string;
+  testEventCode?: string;
 }) => {
   await sendMetaEvent({
     eventName: 'Purchase',
     eventId: orderData.eventId || generateEventId(),
     eventSourceUrl: orderData.sourceUrl,
     userData: orderData.userData,
+    testEventCode: orderData.testEventCode,
     customData: {
       currency: orderData.currency || 'BDT',
       value: orderData.totalAmount,
       order_id: orderData.orderId,
       content_type: 'product',
       num_items: orderData.items.length,
+      content_ids: orderData.items.map(item => item.productId).filter(Boolean),
       contents: orderData.items.map(item => ({
         id: item.productId,
         quantity: item.quantity,
@@ -188,12 +261,14 @@ export const trackInitiateCheckout = async (checkoutData: {
   userData: MetaUserData;
   eventId?: string;
   sourceUrl?: string;
+  testEventCode?: string;
 }) => {
   await sendMetaEvent({
     eventName: 'InitiateCheckout',
     eventId: checkoutData.eventId || generateEventId(),
     eventSourceUrl: checkoutData.sourceUrl,
     userData: checkoutData.userData,
+    testEventCode: checkoutData.testEventCode,
     customData: {
       currency: checkoutData.currency || 'BDT',
       value: checkoutData.totalAmount,
@@ -205,20 +280,22 @@ export const trackInitiateCheckout = async (checkoutData: {
 };
 
 /** Contact event — when user submits contact form */
-export const trackContact = async (userData: MetaUserData, eventId?: string) => {
+export const trackContact = async (userData: MetaUserData, eventId?: string, testEventCode?: string) => {
   await sendMetaEvent({
     eventName: 'Contact',
     eventId: eventId || generateEventId(),
     userData,
+    testEventCode,
   });
 };
 
 /** CompleteRegistration event — after successful sign up */
-export const trackRegistration = async (userData: MetaUserData, eventId?: string) => {
+export const trackRegistration = async (userData: MetaUserData, eventId?: string, testEventCode?: string) => {
   await sendMetaEvent({
     eventName: 'CompleteRegistration',
     eventId: eventId || generateEventId(),
     userData,
+    testEventCode,
     customData: {
       status: true,
     },

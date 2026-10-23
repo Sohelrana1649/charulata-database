@@ -30,6 +30,7 @@ export const checkout = catchAsync(async (req: AuthenticatedRequest, res: Respon
       fbc: req.body._fbc,
     },
     eventId: req.body._eventId,
+    testEventCode: req.body._testEventCode || req.body.testEventCode || (req.headers['x-meta-test-event-code'] as string) || undefined,
   }).catch(err => console.error('[META CAPI] checkout error:', err));
 
   res.status(201).json({
@@ -64,6 +65,7 @@ export const guestCheckout = catchAsync(async (req: Request, res: Response) => {
       fbc: req.body._fbc,
     },
     eventId: req.body._eventId,
+    testEventCode: req.body._testEventCode || req.body.testEventCode || (req.headers['x-meta-test-event-code'] as string) || undefined,
   }).catch(err => console.error('[META CAPI] guestCheckout error:', err));
 
   res.status(201).json({
