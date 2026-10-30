@@ -2,15 +2,20 @@ import { Request, Response } from 'express';
 import { AuthenticatedRequest } from '../middlewares/auth';
 import { OrderService } from '../services/order.service';
 import { catchAsync } from '../utils/catchAsync';
-import { trackPurchase } from '../utils/metaPixel';
+import { trackPurchase, getPurchaseEventId, getMetaRequestContext } from '../utils/metaPixel';
 
 export const checkout = catchAsync(async (req: AuthenticatedRequest, res: Response) => {
   const userId = req.user!._id.toString();
   const order = await OrderService.checkout(userId, req.body);
 
+  const orderRef = order._id?.toString() || order.orderId || '';
+  // Same ID must be used by browser fbq('track','Purchase',..., {eventID}) and by CAPI.
+  const metaEventId: string = req.body._eventId || getPurchaseEventId(orderRef);
+  const ctx = getMetaRequestContext(req);
+
   // Fire-and-forget: Send Purchase event to Meta Conversions API
   trackPurchase({
-    orderId: order._id?.toString() || order.orderId || '',
+    orderId: orderRef,
     totalAmount: order.totalAmount || 0,
     currency: 'BDT',
     items: (order.items || []).map((item: any) => ({
@@ -24,17 +29,19 @@ export const checkout = catchAsync(async (req: AuthenticatedRequest, res: Respon
       phone: req.user?.phone,
       firstName: req.user?.name?.split(' ')[0],
       externalId: userId,
-      clientIpAddress: (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() || req.ip,
-      clientUserAgent: req.headers['user-agent'],
-      fbp: req.body._fbp,
-      fbc: req.body._fbc,
+      clientIpAddress: ctx.clientIpAddress,
+      clientUserAgent: ctx.clientUserAgent,
+      fbp: ctx.fbp,
+      fbc: ctx.fbc,
     },
-    eventId: req.body._eventId,
+    eventId: metaEventId,
+    sourceUrl: ctx.sourceUrl,
     testEventCode: req.body._testEventCode || req.body.testEventCode || (req.headers['x-meta-test-event-code'] as string) || undefined,
   }).catch(err => console.error('[META CAPI] checkout error:', err));
 
   res.status(201).json({
     status: 'success',
+    metaEventId,
     data: { order }
   });
 });
@@ -42,9 +49,14 @@ export const checkout = catchAsync(async (req: AuthenticatedRequest, res: Respon
 export const guestCheckout = catchAsync(async (req: Request, res: Response) => {
   const order = await OrderService.guestCheckout(req.body);
 
+  const orderRef = order._id?.toString() || order.orderId || '';
+  // Same ID must be used by browser fbq('track','Purchase',..., {eventID}) and by CAPI.
+  const metaEventId: string = req.body._eventId || getPurchaseEventId(orderRef);
+  const ctx = getMetaRequestContext(req);
+
   // Fire-and-forget: Send Purchase event to Meta Conversions API
   trackPurchase({
-    orderId: order._id?.toString() || order.orderId || '',
+    orderId: orderRef,
     totalAmount: order.totalAmount || 0,
     currency: 'BDT',
     items: (order.items || []).map((item: any) => ({
@@ -59,18 +71,20 @@ export const guestCheckout = catchAsync(async (req: Request, res: Response) => {
       firstName: req.body.name?.split(' ')[0] || req.body.shippingAddress?.recipientName?.split(' ')[0],
       city: req.body.shippingAddress?.district,
       country: 'bd',
-      clientIpAddress: (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() || req.ip,
-      clientUserAgent: req.headers['user-agent'],
-      fbp: req.body._fbp,
-      fbc: req.body._fbc,
+      clientIpAddress: ctx.clientIpAddress,
+      clientUserAgent: ctx.clientUserAgent,
+      fbp: ctx.fbp,
+      fbc: ctx.fbc,
     },
-    eventId: req.body._eventId,
+    eventId: metaEventId,
+    sourceUrl: ctx.sourceUrl,
     testEventCode: req.body._testEventCode || req.body.testEventCode || (req.headers['x-meta-test-event-code'] as string) || undefined,
   }).catch(err => console.error('[META CAPI] guestCheckout error:', err));
 
   res.status(201).json({
     status: 'success',
     message: 'Order placed successfully',
+    metaEventId,
     data: { order }
   });
 });

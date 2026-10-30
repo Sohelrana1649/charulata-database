@@ -1,6 +1,6 @@
 import { Request, Response } from 'express';
 import { catchAsync } from '../utils/catchAsync';
-import { sendMetaEvent, MetaUserData } from '../utils/metaPixel';
+import { sendMetaEvent, MetaUserData, getMetaRequestContext } from '../utils/metaPixel';
 
 /**
  * Controller to handle public client-side Meta Conversions API (CAPI) events
@@ -30,14 +30,27 @@ export const handleMetaTrackingEvent = catchAsync(async (req: Request, res: Resp
     return res.status(400).json({ status: 'fail', message: `Event ${eventName} not supported via tracking proxy` });
   }
 
-  // Extract client IP & User Agent from real request headers
-  const clientIp = (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() || req.socket.remoteAddress || req.ip;
-  const clientUserAgent = (req.headers['user-agent'] as string) || '';
+  // The server must reuse the exact eventID the browser passed to fbq(). Never generate a new one here,
+  // otherwise Meta sees two different events and counts the conversion twice.
+  if (!eventId || typeof eventId !== 'string' || eventId.length > 128) {
+    return res.status(400).json({
+      status: 'fail',
+      message: 'eventId (the same ID used in the browser fbq eventID) is required for deduplication',
+    });
+  }
+
+  const ctx = getMetaRequestContext(req, {
+    fbp: userData.fbp,
+    fbc: userData.fbc,
+    sourceUrl: eventSourceUrl,
+  });
 
   const enrichedUserData: MetaUserData = {
     ...userData,
-    clientIpAddress: clientIp,
-    clientUserAgent: clientUserAgent,
+    clientIpAddress: ctx.clientIpAddress,
+    clientUserAgent: ctx.clientUserAgent,
+    fbp: ctx.fbp,
+    fbc: ctx.fbc,
   };
 
   const activeTestCode = testEventCode || (req.headers['x-meta-test-event-code'] as string) || undefined;
@@ -46,7 +59,8 @@ export const handleMetaTrackingEvent = catchAsync(async (req: Request, res: Resp
   sendMetaEvent({
     eventName,
     eventId,
-    eventSourceUrl: eventSourceUrl || req.headers.referer || undefined,
+    actionSource: 'website',
+    eventSourceUrl: ctx.sourceUrl,
     userData: enrichedUserData,
     customData,
     testEventCode: activeTestCode,

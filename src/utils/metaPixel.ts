@@ -1,4 +1,5 @@
 import crypto from 'crypto';
+import type { Request } from 'express';
 
 /**
  * Meta Conversions API (CAPI) Utility
@@ -115,6 +116,9 @@ export const sendMetaEvent = async (options: MetaEventOptions): Promise<void> =>
 
   if (options.eventId) {
     eventData.event_id = options.eventId;
+  } else {
+    // Without an event_id Meta cannot deduplicate this server event against the browser event.
+    console.warn(`[META CAPI] ⚠️ ${options.eventName} sent WITHOUT event_id — it cannot be deduplicated with the browser pixel.`);
   }
   if (options.eventSourceUrl) {
     eventData.event_source_url = options.eventSourceUrl;
@@ -157,6 +161,54 @@ export const sendMetaEvent = async (options: MetaEventOptions): Promise<void> =>
  */
 export const generateEventId = (): string => {
   return `${Date.now()}_${crypto.randomBytes(8).toString('hex')}`;
+};
+
+/**
+ * Deterministic Purchase event ID derived from the order.
+ * Used only when the browser did not supply an event ID; the same value is returned
+ * to the client in the checkout response so the browser `fbq('track','Purchase',{...},{eventID})`
+ * uses the exact same ID as the server CAPI event.
+ */
+export const getPurchaseEventId = (orderId: string): string => `purchase_${orderId}`;
+
+const readCookie = (cookieHeader: string | undefined, name: string): string | undefined => {
+  if (!cookieHeader) return undefined;
+  const entry = cookieHeader.split(';').map(c => c.trim()).find(c => c.startsWith(`${name}=`));
+  return entry ? decodeURIComponent(entry.slice(name.length + 1)) : undefined;
+};
+
+const pickString = (...values: any[]): string | undefined => {
+  for (const v of values) {
+    if (typeof v === 'string' && v.trim()) return v.trim();
+  }
+  return undefined;
+};
+
+/**
+ * Collect the request-level matching parameters Meta needs for good Event Match Quality:
+ * client_ip_address, client_user_agent, _fbp, _fbc and event_source_url.
+ * Body values (sent by the browser) win; the Cookie header is used as a fallback.
+ */
+export const getMetaRequestContext = (req: Request, overrides: { fbp?: any; fbc?: any; sourceUrl?: any } = {}) => {
+  const forwarded = (req.headers['x-forwarded-for'] as string | undefined)?.split(',')[0]?.trim();
+  const rawIp = forwarded || req.socket?.remoteAddress || req.ip;
+  const clientIpAddress = rawIp ? rawIp.replace(/^::ffff:/, '') : undefined;
+  const cookieHeader = req.headers.cookie as string | undefined;
+  const body = req.body || {};
+
+  return {
+    clientIpAddress,
+    clientUserAgent: req.headers['user-agent'] as string | undefined,
+    fbp: pickString(overrides.fbp, body._fbp, body.fbp, readCookie(cookieHeader, '_fbp')),
+    fbc: pickString(overrides.fbc, body._fbc, body.fbc, readCookie(cookieHeader, '_fbc')),
+    sourceUrl: pickString(
+      overrides.sourceUrl,
+      body._eventSourceUrl,
+      body.eventSourceUrl,
+      req.headers.referer as string | undefined,
+      req.headers.origin as string | undefined,
+    ),
+  };
 };
 
 // ─── Pre-built E-commerce Event Helpers ───
@@ -280,20 +332,22 @@ export const trackInitiateCheckout = async (checkoutData: {
 };
 
 /** Contact event — when user submits contact form */
-export const trackContact = async (userData: MetaUserData, eventId?: string, testEventCode?: string) => {
+export const trackContact = async (userData: MetaUserData, eventId?: string, testEventCode?: string, sourceUrl?: string) => {
   await sendMetaEvent({
     eventName: 'Contact',
     eventId: eventId || generateEventId(),
+    eventSourceUrl: sourceUrl,
     userData,
     testEventCode,
   });
 };
 
 /** CompleteRegistration event — after successful sign up */
-export const trackRegistration = async (userData: MetaUserData, eventId?: string, testEventCode?: string) => {
+export const trackRegistration = async (userData: MetaUserData, eventId?: string, testEventCode?: string, sourceUrl?: string) => {
   await sendMetaEvent({
     eventName: 'CompleteRegistration',
     eventId: eventId || generateEventId(),
+    eventSourceUrl: sourceUrl,
     userData,
     testEventCode,
     customData: {

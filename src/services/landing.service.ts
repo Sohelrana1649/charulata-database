@@ -6,7 +6,7 @@ import { User } from '../models/user.model';
 import { CampaignService } from './campaign.service';
 
 // Fields needed for product cards on the landing page (no full description, no variants)
-const PRODUCT_CARD_FIELDS = 'title slug price salePrice productImages badge bestSelling newArrival flashSale discountStartDate discountEndDate ratings _id';
+const PRODUCT_CARD_FIELDS = 'title slug price salePrice productImages badge bestSelling newArrival flashSale discountStartDate discountEndDate ratings sku _id';
 
 export class LandingService {
   /**
