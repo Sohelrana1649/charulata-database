@@ -9,6 +9,7 @@
     "postinstall": "npm run build",
     "start": "node dist/app.js",
     "seed": "ts-node src/scripts/seed.ts",
+    "seed:locations": "ts-node scripts/seed-locations.ts",
     "seed:categories": "ts-node src/scripts/updateCategoryOrders.ts",
     "seed:attributes": "ts-node src/scripts/seedAttributes.ts",
     "seed:reviews": "ts-node src/scripts/seedReviews.ts",
