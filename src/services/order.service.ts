@@ -10,6 +10,7 @@ import { AnalyticsLog } from '../models/analyticsLog.model';
 import { User } from '../models/user.model';
 import { Settings } from '../models/settings.model';
 import { AppError } from '../utils/appError';
+import { revalidateFrontend } from '../utils/revalidate';
 
 export class OrderService {
   /**
@@ -329,8 +330,40 @@ export class OrderService {
       const productId = typeof item.product === 'object' ? item.product._id : item.product;
       const productObj = await Product.findById(productId);
       if (productObj) {
-        productObj.stockQuantity -= item.quantity;
+        productObj.stockQuantity = Math.max(0, productObj.stockQuantity - item.quantity);
+
+        // Deduct from variant stock if selected
+        const selColor = item.selectedColor || item.color;
+        const selSize = item.selectedSize || item.size;
+        if (selColor || selSize) {
+          const variantIndex = productObj.variants.findIndex(
+            (v: any) =>
+              (!selColor || v.color === selColor) &&
+              (!selSize || v.size === selSize)
+          );
+          if (variantIndex > -1) {
+            productObj.variants[variantIndex].stockQuantity = Math.max(
+              0,
+              productObj.variants[variantIndex].stockQuantity - item.quantity
+            );
+          }
+        }
         await productObj.save();
+
+        // Trigger low-stock alert if below threshold (e.g. 5)
+        if (productObj.stockQuantity <= 5) {
+          await Notification.create({
+            type: 'StockAlert',
+            title: `Low Stock Alert: ${productObj.title}`,
+            message: `Product "${productObj.title}" is running low on stock. Only ${productObj.stockQuantity} items remaining.`,
+            metadata: { productId: productObj._id, stockQuantity: productObj.stockQuantity }
+          });
+        }
+
+        // Revalidate Next.js frontend ISR cache immediately
+        revalidateFrontend(['/', `/products/${productObj.slug}`]).catch((err) =>
+          console.error('[REVALIDATE ERROR]', err)
+        );
       }
     }
 
@@ -630,7 +663,7 @@ export class OrderService {
       const productObj = item.product as any;
 
       // Deduct from overall product stock
-      productObj.stockQuantity -= item.quantity;
+      productObj.stockQuantity = Math.max(0, productObj.stockQuantity - item.quantity);
       
       // Deduct from variant stock if selected
       if (item.color || item.size) {
@@ -640,11 +673,19 @@ export class OrderService {
             (!item.size || v.size === item.size)
         );
         if (variantIndex > -1) {
-          productObj.variants[variantIndex].stockQuantity -= item.quantity;
+          productObj.variants[variantIndex].stockQuantity = Math.max(
+            0,
+            productObj.variants[variantIndex].stockQuantity - item.quantity
+          );
         }
       }
 
       await productObj.save();
+
+      // Revalidate Next.js frontend ISR cache immediately
+      revalidateFrontend(['/', `/products/${productObj.slug}`]).catch((err) =>
+        console.error('[REVALIDATE ERROR]', err)
+      );
 
       // Trigger low-stock alert if below threshold (e.g. 5)
       if (productObj.stockQuantity <= 5) {
@@ -862,6 +903,9 @@ export class OrderService {
               }
             }
             await product.save();
+            revalidateFrontend(['/', `/products/${product.slug}`]).catch((err) =>
+              console.error('[REVALIDATE ERROR]', err)
+            );
           }
         }
         break;

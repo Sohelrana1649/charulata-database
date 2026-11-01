@@ -4,6 +4,7 @@ import { slugify } from '../utils/slugify';
 import { AppError } from '../utils/appError';
 import { AnalyticsLog } from '../models/analyticsLog.model';
 import { uploadBase64ToCloudinary } from '../utils/cloudinary';
+import { revalidateFrontend } from '../utils/revalidate';
 
 interface VariantOverride {
   match: Record<string, string>;
@@ -194,7 +195,13 @@ export class ProductService {
     data.metaDescription = seo.metaDescription;
 
     const product = await Product.create({ ...data, image, images, slug });
-    return Product.findById(product._id).populate('category').populate('parentCategory');
+    const populated = await Product.findById(product._id).populate('category').populate('parentCategory');
+    if (populated) {
+      revalidateFrontend(['/', `/products/${populated.slug}`]).catch((err) =>
+        console.error('[REVALIDATE ERROR]', err)
+      );
+    }
+    return populated;
   }
 
   static async updateProduct(id: string, data: any) {
@@ -269,12 +276,18 @@ export class ProductService {
     }).populate('category').populate('parentCategory');
 
     if (!product) throw new AppError('Product not found', 404);
+    revalidateFrontend(['/', `/products/${product.slug}`]).catch((err) =>
+      console.error('[REVALIDATE ERROR]', err)
+    );
     return product;
   }
 
   static async deleteProduct(id: string) {
     const product = await Product.findByIdAndDelete(id);
     if (!product) throw new AppError('Product not found', 404);
+    revalidateFrontend(['/', `/products/${product.slug}`]).catch((err) =>
+      console.error('[REVALIDATE ERROR]', err)
+    );
     return product;
   }
 
@@ -295,6 +308,7 @@ export class ProductService {
         { _id: { $in: productIds } },
         { $set: allowedFields }
       );
+      revalidateFrontend(['/']).catch((err) => console.error('[REVALIDATE ERROR]', err));
     }
 
     return {
