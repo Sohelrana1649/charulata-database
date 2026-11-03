@@ -1,37 +1,9 @@
-import rateLimit from 'express-rate-limit';
-import { config } from '../config';
+import { Request, Response, NextFunction } from 'express';
 
-const isDev = config.nodeEnv === 'development';
-
-export const apiLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: isDev ? 10000 : 100, // Limit each IP to 100 requests per `window`
-  standardHeaders: true, // Return rate limit info in the `RateLimit-*` headers
-  legacyHeaders: false, // Disable the `X-RateLimit-*` headers
-  message: {
-    status: 'fail',
-    message: 'Too many requests from this IP, please try again after 15 minutes'
-  }
-});
-
-export const authLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: isDev ? 1000 : 10, // Limit each IP to 10 requests per `window` (e.g. login, OTP)
-  standardHeaders: true,
-  legacyHeaders: false,
-  message: {
-    status: 'fail',
-    message: 'Too many authentication attempts. Please try again after 15 minutes'
-  }
-});
-
-export const leadLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: isDev ? 1000 : 10, // Limit each IP to 10 requests per 15 minutes for lead captures
-  standardHeaders: true,
-  legacyHeaders: false,
-  message: {
-    status: 'fail',
-    message: 'Too many requests from this IP. Please try again after 15 minutes.'
-  }
-});
+/**
+ * 15-minute IP restriction removed.
+ * Pass-through middleware so requests, authentication, and leads are never blocked by IP detection.
+ */
+export const apiLimiter = (_req: Request, _res: Response, next: NextFunction) => next();
+export const authLimiter = (_req: Request, _res: Response, next: NextFunction) => next();
+export const leadLimiter = (_req: Request, _res: Response, next: NextFunction) => next();

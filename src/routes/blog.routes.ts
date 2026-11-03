@@ -38,16 +38,8 @@ const blogUploadFields = upload.fields([
 ]);
 
 // Brute-force rate limiting for preview endpoint (token-guessing protection)
-const previewLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: config.nodeEnv === 'development' ? 500 : 50,
-  standardHeaders: true,
-  legacyHeaders: false,
-  message: {
-    status: 'fail',
-    message: 'Too many preview attempts from this IP, please try again after 15 minutes',
-  },
-});
+// 15-minute IP restriction removed
+const previewLimiter = (_req: Request, _res: any, next: any) => next();
 
 const router = Router();
 

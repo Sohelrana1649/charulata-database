@@ -410,6 +410,16 @@ export class OrderService {
       throw new AppError('Your cart is empty', 400);
     }
 
+    // Auto-clean any ghost/deleted/inactive items
+    const initialItemCount = cart.items.length;
+    cart.items = cart.items.filter((item: any) => item.product && item.product.isActive !== false);
+    if (cart.items.length !== initialItemCount) {
+      await cart.save();
+    }
+    if (cart.items.length === 0) {
+      throw new AppError("The products in your cart are no longer available. Please select available products.", 400);
+    }
+
     // 2) Validate stock and calculate subtotal
     let subTotal = 0;
     const orderItems: any[] = [];

@@ -6,6 +6,12 @@ export class CartService {
     let cart = await Cart.findOne({ customer: userId }).populate('items.product');
     if (!cart) {
       cart = await Cart.create({ customer: userId, items: [] });
+    } else {
+      const initialCount = cart.items.length;
+      cart.items = cart.items.filter((item: any) => item.product && item.product.isActive !== false);
+      if (cart.items.length !== initialCount) {
+        await cart.save();
+      }
     }
     return cart;
   }
