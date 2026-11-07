@@ -509,7 +509,8 @@ export class OrderService {
         }
 
         if (matched) {
-          if (matched.stockQuantity < item.quantity) {
+          const hasVariantStock = productObj.variants.some((v: any) => (Number(v?.stockQuantity) || 0) > 0);
+          if (hasVariantStock && (Number(matched.stockQuantity) || 0) < item.quantity) {
             throw new AppError(`Insufficient stock for selected variant of product: ${productObj.title}`, 400);
           }
           if (typeof matched.price === 'number' && matched.price > 0) variantRegularPrice = matched.price;
