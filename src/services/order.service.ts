@@ -11,6 +11,7 @@ import { User } from '../models/user.model';
 import { Settings } from '../models/settings.model';
 import { AppError } from '../utils/appError';
 import { revalidateFrontend } from '../utils/revalidate';
+import { trackPurchase, getPurchaseEventId } from '../utils/metaPixel';
 
 export class OrderService {
   /**
@@ -864,6 +865,39 @@ export class OrderService {
         order.confirmedAt = now;
         title = 'Order Confirmed';
         description = 'Admin has confirmed your Cash on Delivery order.';
+
+        // ─── Fire Meta CAPI Purchase event on Confirmed (not Pending) ───
+        // Populate product data to get SKU (retailer_id for Meta Catalog matching)
+        await order.populate('items.product', 'sku title');
+        {
+          const confirmedOrderRef = order.orderId ? String(order.orderId) : String(order._id);
+          const metaEventId = getPurchaseEventId(confirmedOrderRef);
+
+          // Fetch customer data for user_data matching
+          const customer = await User.findById(order.customer).select('email phone name').lean();
+
+          trackPurchase({
+            orderId: confirmedOrderRef,
+            totalAmount: order.totalAmount || 0,
+            currency: 'BDT',
+            items: (order.items || []).map((item: any) => ({
+              // Use product SKU as content_id — this must match Meta Catalog retailer_id
+              productId: item.product?.sku ? String(item.product.sku).trim() : (item.product?._id?.toString() || ''),
+              name: item.product?.title || '',
+              quantity: item.quantity || 1,
+              price: item.price || 0,
+            })),
+            userData: {
+              email: customer?.email,
+              phone: customer?.phone,
+              firstName: customer?.name?.split(' ')[0],
+              externalId: order.customer?.toString(),
+            },
+            eventId: metaEventId,
+          }).catch(err => console.error('[META CAPI] Purchase on Confirmed error:', err));
+
+          console.log(`[META CAPI] 🔔 Purchase event queued for confirmed order ${confirmedOrderRef} (eventId: ${metaEventId})`);
+        }
         break;
       case 'Processing':
         order.processedAt = now;

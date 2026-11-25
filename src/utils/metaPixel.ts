@@ -169,7 +169,7 @@ export const generateEventId = (): string => {
  * to the client in the checkout response so the browser `fbq('track','Purchase',{...},{eventID})`
  * uses the exact same ID as the server CAPI event.
  */
-export const getPurchaseEventId = (orderId: string): string => `purchase_${orderId}`;
+export const getPurchaseEventId = (orderId: string): string => `pur_${orderId}`;
 
 const readCookie = (cookieHeader: string | undefined, name: string): string | undefined => {
   if (!cookieHeader) return undefined;
